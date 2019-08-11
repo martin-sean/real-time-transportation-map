@@ -1,0 +1,14 @@
+.leaflet-div-icon {
+    background: transparent;
+    border: none;
+}
+
+.train-icon {
+    background: transparent;
+    border: none;
+    z-index: 10000 !important;
+}
+
+.leaflet-popup-pane {
+    opacity: 0.8 !important;
+}
