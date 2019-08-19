@@ -266,13 +266,13 @@ export default class Map extends Component {
                                             time = moment.utc(stations[index].departures[index2].estimated_departure_utc);
                                             let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
                                             return <span>
-                                                <strong>(Estimated)</strong> {routeNames[stations[index].departures[index2].route_id - 1]} -> {timeStamp} mins<br/>
+                                                <strong>(Estimated)</strong> {routeNames[stations[index].departures[index2].route_id - 1]} (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins<br/>
                                             </span>
                                         } else {
                                             time = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                             let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
                                             return <span>
-                                                (Scheduled) {routeNames[stations[index].departures[index2].route_id - 1]} -> {timeStamp} mins<br/>
+                                                (Scheduled) {routeNames[stations[index].departures[index2].route_id - 1]} (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins<br/>
                                             </span>
                                         }
                                     })
@@ -282,17 +282,14 @@ export default class Map extends Component {
                     })
                 }
 
-
                 {
-                    // stations.map((key, index) => {
-                    //     return stations[index].map((key2, index2) => {
-                    //         if (index2 < stations[index].length - 1) {
-                    //             let nextIndex = index2 + 1;
-                    //             const positions = [[stations[index][index2].stop_latitude, stations[index][index2].stop_longitude], [stations[index][nextIndex].stop_latitude, stations[index][nextIndex].stop_longitude]];
-                    //             return <Polyline positions={positions} />
-                    //         }
-                    //     })
-                    // })
+                // REQUIRES STATIONS SEPERATED INTO
+                //     stations.map((key, index) => {
+                //         if (index < stations.length - 1) {
+                //             const positions = [[stations[index].stop_latitude, stations[index].stop_longitude], [stations[index + 1].stop_latitude, stations[index + 1].stop_longitude]];
+                //             return <Polyline positions={positions} />
+                //         }
+                //     })
                 }
             </LeafletMap >
         );
