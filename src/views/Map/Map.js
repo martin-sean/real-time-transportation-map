@@ -127,6 +127,7 @@ export default class Map extends Component {
                                 let icon;
                                 let angle;
                                 let tooltip;
+
                                 if (runs[index].departure[0].estimated_departure_utc) {
                                     const estimatedTime = moment.utc(runs[index].departure[0].estimated_departure_utc);
                                     timeStamp = Math.abs(estimatedTime.diff(moment.utc(), 'minutes'));
@@ -180,9 +181,10 @@ export default class Map extends Component {
                                         <span><strong> {routeNames[runs[index].departure[0].route_id - 1]} </strong></span><br />
                                         <span><strong>At {filteredDetails[0].stopName}</strong></span><br />
                                         <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
-                                        <span><strong>Arrival Time:</strong> {timeStamp}</span><br />
+                                        <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
                                         <span><strong>Direction ID:</strong> {runs[index].coordinates.direction_id}</span>
                                     </Tooltip>
+
                                 } else if (previousStopCoordinates) {
                                     let scalar;
                                     if (timeStamp > 3) {
@@ -205,7 +207,7 @@ export default class Map extends Component {
                                     tooltip = <Tooltip>
                                         <span><strong> {routeNames[runs[index].departure[0].route_id - 1]} </strong></span><br />
                                         <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
-                                        <span><strong>Arrival Time:</strong> {timeStamp}</span><br />
+                                        <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
                                         <span><strong>Direction ID:</strong> {runs[index].coordinates.direction_id}</span>
                                     </Tooltip>
                                 }
@@ -265,14 +267,27 @@ export default class Map extends Component {
                                         if(stations[index].departures[index2].estimated_departure_utc) {
                                             time = moment.utc(stations[index].departures[index2].estimated_departure_utc);
                                             let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
+
+                                            // Calculate difference in estimated and scheduled time
+                                            let schedule = "";
+                                            const estimatedTime = moment.utc(stations[index].departures[index2].estimated_departure_utc);
+                                            const scheduledTime = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
+                                            let diff = Math.abs(estimatedTime.diff(scheduledTime, 'minutes'));
+                                            if (stations[index].departures[index2].estimated_departure_utc && diff > 0) {
+                                                let highlight = diff >= 10 ? "very-late-highlight" : diff >= 5 ? "late-highlight" : "behind-highlight";
+                                                schedule = <mark id={highlight}>{'(' + diff + ' min late)'}</mark>;
+                                            }
+
                                             return <span>
-                                                <strong>(Estimated)</strong> {routeNames[stations[index].departures[index2].route_id - 1]} (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins<br/>
+                                                <strong>(Estimated)</strong> {routeNames[stations[index].departures[index2].route_id - 1]}
+                                                (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins {schedule}<br/>
                                             </span>
                                         } else {
                                             time = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                             let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
                                             return <span>
-                                                (Scheduled) {routeNames[stations[index].departures[index2].route_id - 1]} (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins<br/>
+                                                (Scheduled) {routeNames[stations[index].departures[index2].route_id - 1]}
+                                                (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins<br/>
                                             </span>
                                         }
                                     })

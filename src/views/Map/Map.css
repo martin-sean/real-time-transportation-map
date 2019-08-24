@@ -12,3 +12,19 @@
 .leaflet-popup-pane {
     opacity: 0.8 !important;
 }
+
+#behind-highlight {
+    background-color: transparent;
+    color: black;
+}
+
+#late-highlight {
+    background-color: yellow;
+    color: black;
+}
+
+#very-late-highlight {
+    background-color: red;
+    color: white;
+    font-weight: bold;
+}
