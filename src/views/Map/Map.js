@@ -64,6 +64,18 @@ export default class Map extends Component {
         }
     }
 
+    getDirectionName(route_id, direction_id) {
+        for(let i in this.state.routes) {
+            if(this.state.routes[i].route_id === route_id) {
+                for(let j in this.state.routes[i].directions) {
+                    if(this.state.routes[i].directions[j].direction_id == direction_id) {
+                        return this.state.routes[i].directions[j].direction_name;
+                    }
+                }
+            }
+        }
+    }
+
     componentDidMount() {
         axios.all([getRouteDescriptions(),
                    getStationDepartures(),
@@ -160,10 +172,11 @@ export default class Map extends Component {
                                     coordinates = runs[index].coordinates.nextStopCoordinates;
                                     tooltip = <Tooltip>
                                         <span><strong> {this.getRouteName(runs[index].departure[0].route_id)} </strong></span><br />
+                                        <span><strong>(to {this.getDirectionName(runs[index].departure[0].route_id,
+                                                           runs[index].coordinates.direction_id)})</strong></span><br/>
                                         <span><strong>At {filteredDetails[0].stopName}</strong></span><br />
                                         <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
                                         <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
-                                        <span><strong>Direction ID:</strong> {runs[index].coordinates.direction_id}</span>
                                     </Tooltip>
 
                                 } else if (previousStopCoordinates) {
@@ -185,9 +198,10 @@ export default class Map extends Component {
                                     coordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
                                     tooltip = <Tooltip>
                                         <span><strong> {this.getRouteName(runs[index].departure[0].route_id)} </strong></span><br />
+                                        <span><strong>(to {this.getDirectionName(runs[index].departure[0].route_id,
+                                                           runs[index].coordinates.direction_id)})</strong></span><br/>
                                         <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
                                         <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
-                                        <span><strong>Direction ID:</strong> {runs[index].coordinates.direction_id}</span>
                                     </Tooltip>
                                 }
 
@@ -206,6 +220,8 @@ export default class Map extends Component {
                                         </Popup>
                                         <Tooltip>
                                             <span><strong> {this.getRouteName(runs[index].departure[0].route_id)} </strong></span><br />
+                                            <span><strong>(to {this.getDirectionName(runs[index].departure[0].route_id,
+                                                runs[index].coordinates.direction_id)})</strong></span><br/>
                                             <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
                                             <span><strong>Departure Time:</strong> {timeStamp}</span>
                                         </Tooltip>
@@ -258,15 +274,17 @@ export default class Map extends Component {
                                             }
 
                                             return <span>
-                                                <strong>(Estimated)</strong> {this.getRouteName(stations[index].departures[index2].route_id)} 
-                                                (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins {schedule}<br/>
+                                                <strong>(Estimated)</strong> {this.getRouteName(stations[index].departures[index2].route_id) + " "}
+                                                (to {this.getDirectionName(stations[index].departures[index2].route_id,
+                                                     stations[index].departures[index2].direction_id)}) -> {timeStamp} mins {schedule}<br/>
                                             </span>
                                         } else {
                                             time = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                             let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
                                             return <span>
-                                                (Scheduled) {this.getRouteName(stations[index].departures[index2].route_id)} 
-                                                (Direction: {stations[index].departures[index2].direction_id}) -> {timeStamp} mins<br/>
+                                                (Scheduled) {this.getRouteName(stations[index].departures[index2].route_id) + " "}
+                                                (to {this.getDirectionName(stations[index].departures[index2].route_id,
+                                                     stations[index].departures[index2].direction_id)}) -> {timeStamp} mins<br/>
                                             </span>
                                         }
                                     })
