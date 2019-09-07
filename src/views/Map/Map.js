@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import { Map as LeafletMap, TileLayer, Marker, Popup, Tooltip, Polyline } from 'react-leaflet';
+import { Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
 // import worldGeoJSON from 'geojson-world-map';
 
@@ -20,6 +20,12 @@ import RotatedMarker from '../../components/leaflet-icons/RotatedMarker';
 const axios = require('axios');
 const moment = require('moment');
 
+// Icon scaling constants
+const ICON_SCALE_FACTOR = 3;
+const MAX_VEHICLE_ICON_LEN = 50;
+const MAX_STATION_ICON_LEN = 40;
+const MIN_ICON_SIZE = 10;
+
 function getRouteDescriptions() {
     return axios.get('/api/routes');
 }
@@ -33,10 +39,48 @@ function getRuns() {
 }
 
 export default class Map extends Component {
-    mapRef = React.createRef();
+    // Event handler hwen map is zoomed, adjusts icon sizes
+    handleZoom() {
+        // Determine how much to scale icons based on zoom level
+        let currZoom = this.mapRef.current.viewport.zoom;
+        let maxZoom = this.mapRef.current.props.maxZoom;
+        let vehicleSize = MAX_VEHICLE_ICON_LEN * Math.pow((currZoom / maxZoom), ICON_SCALE_FACTOR);
+        let stationSize = MAX_STATION_ICON_LEN * Math.pow((currZoom / maxZoom), ICON_SCALE_FACTOR);
+
+        // Disable station icons if they become too small (zoom too far away)
+        if(stationSize > MIN_ICON_SIZE) {
+            railIcon.options.iconSize = [stationSize, stationSize];
+        } else {
+            railIcon.options.iconSize = [0, 0];
+        }
+
+        trainIcon.options.iconSize = [vehicleSize, vehicleSize];
+        trainSideIcon.options.iconSize = [vehicleSize, vehicleSize];
+        trainSideInvertedIcon.options.iconSize = [vehicleSize, vehicleSize];
+
+        // Force update train icons
+        let layers = this.trainRef.current.leafletElement.getLayers();
+        for(let i in layers) {
+            layers[i].refreshIconOptions();
+        }
+
+        // Force update station icons
+        layers = this.stationRef.current.leafletElement.getLayers();
+        for(let i in layers) {
+            layers[i].refreshIconOptions();
+        }
+
+        // this.trainRef.current.leafletElement.refreshClusters();
+    };
 
     constructor(props) {
         super(props);
+
+        // Create references to be used when updating icons
+        this.mapRef = React.createRef();
+        this.trainRef = React.createRef();
+        this.stationRef = React.createRef();
+
         this.state = {
             lat: -37.814,
             lng: 144.96332,
@@ -45,6 +89,8 @@ export default class Map extends Component {
             stationDepartures: [],
             runs: []
         };
+
+        this.handleZoom = this.handleZoom.bind(this);
     }
 
     returnStopName(stop_id) {
@@ -108,14 +154,14 @@ export default class Map extends Component {
         const runs = this.state.runs;
 
         return (
-            <LeafletMap ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17}>
+            <LeafletMap ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     // url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
                     url='https://api.tiles.mapbox.com/v4/mapbox.streets/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2lhdzk2IiwiYSI6ImNqdHRra3FuNDFjeW00MHBjMnNveGdha2QifQ.HK8K4aseYwzjdqAStXAyxg'
                 />
 
-                <MarkerClusterGroup maxClusterRadius={10}>
+                <MarkerClusterGroup maxClusterRadius={10} ref={this.trainRef}>
                     {
                         runs.map((key, index) => {
                             if (runs[index].departure[0].estimated_departure_utc) {
@@ -246,6 +292,7 @@ export default class Map extends Component {
                     }
                 </MarkerClusterGroup>
 
+                <LayerGroup ref={this.stationRef}>
                 {
                     stations.map((key, index) => {
                         // Render each station with name and departures
@@ -293,9 +340,10 @@ export default class Map extends Component {
                         </Marker>
                     })
                 }
+                </LayerGroup>
 
                 {
-                // REQUIRES STATIONS SEPERATED INTO
+                // REQUIRES STATIONS TO BE SORTED IN TRAVERSAL ORDER
                 //     stations.map((key, index) => {
                 //         if (index < stations.length - 1) {
                 //             const positions = [[stations[index].stop_latitude, stations[index].stop_longitude], [stations[index + 1].stop_latitude, stations[index + 1].stop_longitude]];

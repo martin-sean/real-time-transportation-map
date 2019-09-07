@@ -2,12 +2,11 @@ import L from 'leaflet';
 
 const trainIcon2 = new L.icon({
     iconUrl: require('../../../assets/icons/train.svg'),
-    iconAnchor: [20, 0],
-    popupAnchor: [-5, -10],
+    popupAnchor: [0, -10],
     shadowUrl: null,
     shadowSize: null,
     shadowAnchor: null,
-    iconSize: [40, 55],
+    iconSize: [20, 20],
     className: 'leaflet-div-icon'
 });
 
