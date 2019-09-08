@@ -1,6 +1,7 @@
 import React, { Component } from 'react'
 import { Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
+import Control from 'react-leaflet-control'
 // import worldGeoJSON from 'geojson-world-map';
 
 import './Map.css';
@@ -26,6 +27,11 @@ const MAX_VEHICLE_ICON_LEN = 50;
 const MAX_STATION_ICON_LEN = 40;
 const MIN_ICON_SIZE = 10;
 
+// Update frequency
+const DEF_API_REP_FREQ = 15;
+const MAX_API_REP_FREQ = 600;
+const SECONDS_TO_MS = 1000;
+
 function getRouteDescriptions() {
     return axios.get('/api/routes');
 }
@@ -36,6 +42,18 @@ function getStationDepartures() {
 
 function getRuns() {
     return axios.get('/api/runs');
+}
+
+function updateRefresh() {
+    console.log("FUN");
+    console.log(document.getElementById("refreshSlider").value);
+}
+
+function displayRefresh() {
+    let refresh = document.getElementById("refreshSlider").value;
+    let text = refresh + " seconds";
+    document.getElementById("refreshDisplay").value = text;
+    document.getElementById("refreshDisplay").size = text.length - 2;
 }
 
 export default class Map extends Component {
@@ -69,29 +87,7 @@ export default class Map extends Component {
         for(let i in layers) {
             layers[i].refreshIconOptions();
         }
-
-        // this.trainRef.current.leafletElement.refreshClusters();
     };
-
-    constructor(props) {
-        super(props);
-
-        // Create references to be used when updating icons
-        this.mapRef = React.createRef();
-        this.trainRef = React.createRef();
-        this.stationRef = React.createRef();
-
-        this.state = {
-            lat: -37.814,
-            lng: 144.96332,
-            zoom: 13,
-            routes: [],
-            stationDepartures: [],
-            runs: []
-        };
-
-        this.handleZoom = this.handleZoom.bind(this);
-    }
 
     returnStopName(stop_id) {
         for (let i in this.state.stationDepartures) {
@@ -122,6 +118,26 @@ export default class Map extends Component {
         }
     }
 
+    constructor(props) {
+        super(props);
+
+        // Create references to be used when updating icons
+        this.mapRef = React.createRef();
+        this.trainRef = React.createRef();
+        this.stationRef = React.createRef();
+
+        this.state = {
+            lat: -37.814,
+            lng: 144.96332,
+            zoom: 13,
+            routes: [],
+            stationDepartures: [],
+            runs: []
+        };
+
+        this.handleZoom = this.handleZoom.bind(this);
+    }
+
     componentDidMount() {
         axios.all([getRouteDescriptions(),
                    getStationDepartures(),
@@ -145,7 +161,7 @@ export default class Map extends Component {
                     runs: response[2].data.runs
                 });
             });
-        }, 15000);
+        }, DEF_API_REP_FREQ * SECONDS_TO_MS);
     }
 
     render() {
@@ -154,7 +170,14 @@ export default class Map extends Component {
         const runs = this.state.runs;
 
         return (
-            <LeafletMap ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
+            <LeafletMap id="map" ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
+                <Control position="bottomleft">
+                    <div id="refreshBox">
+                        Refresh Rate: <input type="text" defaultValue={DEF_API_REP_FREQ + " seconds"} size="10" id="refreshDisplay" disabled/><br/>
+                        <input type="range" min={DEF_API_REP_FREQ} max={MAX_API_REP_FREQ} defaultValue={DEF_API_REP_FREQ} id="refreshSlider" onMouseUp={updateRefresh} onChange={displayRefresh}/>
+                    </div>
+                </Control>
+
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     // url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
