@@ -28,7 +28,8 @@ const MAX_STATION_ICON_LEN = 40;
 const MIN_ICON_SIZE = 10;
 
 // Update frequency
-const DEF_API_REP_FREQ = 15;
+const DEF_API_REP_FREQ = 30;
+const MIN_API_REP_FREQ = 15;
 const MAX_API_REP_FREQ = 600;
 const SECONDS_TO_MS = 1000;
 
@@ -44,19 +45,68 @@ function getRuns() {
     return axios.get('/api/runs');
 }
 
-function updateRefresh() {
-    console.log("FUN");
-    console.log(document.getElementById("refreshSlider").value);
+// Set refresh rate from API side if already previously set
+function initialiseRefreshRate() {
+    axios.get('/refresh')
+    .then((response) => {
+        this.refreshRate = response.data.refresh;
+        setInitialRefreshRate(this.refreshRate);
+    })
+    .catch(error => {
+        this.refreshRate = DEF_API_REP_FREQ;
+        setInitialRefreshRate(this.refreshRate);
+    });
 }
 
-function displayRefresh() {
-    let refresh = document.getElementById("refreshSlider").value;
+function setInitialRefreshRate(refresh) {
+    displayRefresh(refresh);
+    document.getElementById("refreshSlider").value = refresh;
+    this.refresh = setInterval(this.updateData, refresh * SECONDS_TO_MS);
+}
+
+// Update API rate according to slider value
+function updateRefresh() {
+    this.refreshRate = document.getElementById("refreshSlider").value;
+
+    console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
+
+    // Stop the current refresh cycle and restart with new refresh time
+    if(this.refresh != null) {
+        clearInterval(this.refresh);
+        this.refresh = setInterval(this.updateData, this.refreshRate * SECONDS_TO_MS);
+    }
+
+    axios.post('/refresh', {refreshRate: this.refreshRate});
+}
+
+// Update text above slider to reflect refresh value
+function displayRefresh(refresh) {
     let text = refresh + " seconds";
+
     document.getElementById("refreshDisplay").value = text;
-    document.getElementById("refreshDisplay").size = text.length - 2;
+    document.getElementById("refreshDisplay").size = text.length;
+}
+
+// Driver to update slider value during drag
+function displayRefreshSlider() {
+    displayRefresh(document.getElementById("refreshSlider").value);
 }
 
 export default class Map extends Component {
+    updateData() {
+        console.log("Updating data...");
+        axios.all([getRouteDescriptions(),
+                   getStationDepartures(),
+                   getRuns()])
+        .then((response) => {
+            this.setState({
+                routes: response[0].data,
+                stationDepartures: response[1].data,
+                runs: response[2].data.runs
+            });
+        });
+    }
+
     // Event handler hwen map is zoomed, adjusts icon sizes
     handleZoom() {
         // Determine how much to scale icons based on zoom level
@@ -136,32 +186,16 @@ export default class Map extends Component {
         };
 
         this.handleZoom = this.handleZoom.bind(this);
+        this.updateData = this.updateData.bind(this);
+
+        updateRefresh = updateRefresh.bind(this);
+        displayRefresh = displayRefresh.bind(this);
+        setInitialRefreshRate = setInitialRefreshRate.bind(this);
+        initialiseRefreshRate = initialiseRefreshRate.bind(this);
     }
 
     componentDidMount() {
-        axios.all([getRouteDescriptions(),
-                   getStationDepartures(),
-                   getRuns()])
-        .then((response) => {
-            this.setState({
-                routes: response[0].data,
-                stationDepartures: response[1].data,
-                runs: response[2].data.runs
-            });
-        });
-
-        setInterval(() => {
-            axios.all([getRouteDescriptions(),
-                       getStationDepartures(),
-                       getRuns()])
-            .then((response) => {
-                this.setState({
-                    routes: response[0].data,
-                    stationDepartures: response[1].data,
-                    runs: response[2].data.runs
-                });
-            });
-        }, DEF_API_REP_FREQ * SECONDS_TO_MS);
+        this.updateData();
     }
 
     render() {
@@ -169,12 +203,14 @@ export default class Map extends Component {
         const stations = this.state.stationDepartures;
         const runs = this.state.runs;
 
+        initialiseRefreshRate();
+
         return (
             <LeafletMap id="map" ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
                 <Control position="bottomleft">
                     <div id="refreshBox">
                         Refresh Rate: <input type="text" defaultValue={DEF_API_REP_FREQ + " seconds"} size="10" id="refreshDisplay" disabled/><br/>
-                        <input type="range" min={DEF_API_REP_FREQ} max={MAX_API_REP_FREQ} defaultValue={DEF_API_REP_FREQ} id="refreshSlider" onMouseUp={updateRefresh} onChange={displayRefresh}/>
+                        <input type="range" min={MIN_API_REP_FREQ} max={MAX_API_REP_FREQ} defaultValue={DEF_API_REP_FREQ} id="refreshSlider" onMouseUp={updateRefresh} onChange={displayRefreshSlider}/>
                     </div>
                 </Control>
 
@@ -338,7 +374,7 @@ export default class Map extends Component {
                                             const scheduledTime = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                             let diff = Math.abs(estimatedTime.diff(scheduledTime, 'minutes'));
                                             if (stations[index].departures[index2].estimated_departure_utc && diff > 0) {
-                                                console.log(this.getRouteName(stations[index].departures[index2].route_id) + " is late by " + diff + " mins");
+                                                console.log(this.getRouteName(stations[index].departures[index2].route_id) + " (" + stations[index].departures[index2].run_id + ") " + " is late by " + diff + " mins");
                                                 let highlight = diff >= 10 ? "very-late-highlight" : diff >= 5 ? "late-highlight" : "behind-highlight";
                                                 schedule = <mark id={highlight}>{'(' + diff + ' min late)'}</mark>;
                                             }
