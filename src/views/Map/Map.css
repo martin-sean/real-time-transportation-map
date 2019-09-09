@@ -13,6 +13,46 @@
     opacity: 0.8 !important;
 }
 
+#map {
+  width: 100vw;
+  height: 100vh;
+}
+
+#refreshBox {
+    background-color: white;
+    color: black;
+    overflow: auto;
+    width: 30vh;
+    border-radius: 3px;
+    padding: 5px 10px 5px 10px;
+    box-shadow: 0 0 3px;
+}
+
+#refreshDisplay {
+    padding: 20;
+    background-color: transparent;
+    border-style: none;
+    color: black;
+}
+
+#refreshSlider {
+    -webkit-appearance: none;
+    background: lightgrey;
+    width: 100%;
+    height: 7px;
+    border-radius: 3px;
+    outline: none;
+}
+
+#refreshSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 15px;
+    height: 15px;
+    background: grey;
+    border-radius: 100px;
+    background: royalblue;
+}
+
 #behind-highlight {
     background-color: transparent;
     color: black;

@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import { Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
+import Control from 'react-leaflet-control'
 // import worldGeoJSON from 'geojson-world-map';
 
 import './Map.css';
@@ -30,6 +31,12 @@ const MAX_VEHICLE_ICON_LEN = 50;
 const MAX_STATION_ICON_LEN = 40;
 const MIN_ICON_SIZE = 10;
 
+// Update frequency
+const DEF_API_REP_FREQ = 30;
+const MIN_API_REP_FREQ = 15;
+const MAX_API_REP_FREQ = 600;
+const SECONDS_TO_MS = 1000;
+
 function getRouteDescriptions() {
     return axios.get('/api/routes');
 }
@@ -46,7 +53,69 @@ function swapRouteType() {
     axios.post('/api/swapRouteType');
 }
 
+// Set refresh rate from API side if already previously set
+function initialiseRefreshRate() {
+    axios.get('/refresh')
+        .then((response) => {
+            this.refreshRate = response.data.refresh;
+            setInitialRefreshRate(this.refreshRate);
+        })
+        .catch(error => {
+            this.refreshRate = DEF_API_REP_FREQ;
+            setInitialRefreshRate(this.refreshRate);
+        });
+}
+
+function setInitialRefreshRate(refresh) {
+    displayRefresh(refresh);
+    document.getElementById("refreshSlider").value = refresh;
+    this.refresh = setInterval(this.updateData, refresh * SECONDS_TO_MS);
+}
+
+// Update API rate according to slider value
+function updateRefresh() {
+    this.refreshRate = document.getElementById("refreshSlider").value;
+
+    console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
+
+    // Stop the current refresh cycle and restart with new refresh time
+    if(this.refresh != null) {
+        clearInterval(this.refresh);
+        this.refresh = setInterval(this.updateData, this.refreshRate * SECONDS_TO_MS);
+    }
+
+    axios.post('/refresh', {refreshRate: this.refreshRate});
+}
+
+// Update text above slider to reflect refresh value
+function displayRefresh(refresh) {
+    let text = refresh + " seconds";
+
+    document.getElementById("refreshDisplay").value = text;
+    document.getElementById("refreshDisplay").size = text.length;
+}
+
+// Driver to update slider value during drag
+function displayRefreshSlider() {
+    displayRefresh(document.getElementById("refreshSlider").value);
+}
+
 export default class Map extends Component {
+    // Event handler when map is zoomed, adjusts icon sizes
+    updateData() {
+        console.log("Updating data...");
+        axios.all([getRouteDescriptions(),
+                   getStationDepartures(),
+                   getRuns()])
+        .then((response) => {
+            this.setState({
+                routes: response[0].data,
+                stationDepartures: response[1].data,
+                runs: response[2].data.runs
+            });
+        });
+    }
+
     // Event handler when map is zoomed, adjusts icon sizes
     handleZoom() {
         // Determine how much to scale icons based on zoom level
@@ -77,29 +146,7 @@ export default class Map extends Component {
         for(let i in layers) {
             layers[i].refreshIconOptions();
         }
-
-        // this.trainRef.current.leafletElement.refreshClusters();
     };
-
-    constructor(props) {
-        super(props);
-
-        // Create references to be used when updating icons
-        this.mapRef = React.createRef();
-        this.trainRef = React.createRef();
-        this.stationRef = React.createRef();
-
-        this.state = {
-            lat: -37.814,
-            lng: 144.96332,
-            zoom: 13,
-            routes: [],
-            stationDepartures: [],
-            runs: []
-        };
-
-        this.handleZoom = this.handleZoom.bind(this);
-    }
 
     returnStopName(stop_id) {
         for (let i in this.state.stationDepartures) {
@@ -131,24 +178,14 @@ export default class Map extends Component {
     }
 
     componentDidMount() {
+        this.updateData();
+
         // Change route type button
         L.easyButton('<span class="route-type">&duarr;</span>', swapRouteType).addTo(L.map('transport'));
 
         axios.all([getRouteDescriptions(),
-                   getStationDepartures(),
-                   getRuns()])
-        .then((response) => {
-            this.setState({
-                routes: response[0].data,
-                stationDepartures: response[1].data,
-                runs: response[2].data.runs
-            });
-        });
-
-        setInterval(() => {
-            axios.all([getRouteDescriptions(),
-                       getStationDepartures(),
-                       getRuns()])
+            getStationDepartures(),
+            getRuns()])
             .then((response) => {
                 this.setState({
                     routes: response[0].data,
@@ -156,7 +193,32 @@ export default class Map extends Component {
                     runs: response[2].data.runs
                 });
             });
-        }, 15000);
+    }
+
+    constructor(props) {
+        super(props);
+
+        // Create references to be used when updating icons
+        this.mapRef = React.createRef();
+        this.trainRef = React.createRef();
+        this.stationRef = React.createRef();
+
+        this.state = {
+            lat: -37.814,
+            lng: 144.96332,
+            zoom: 13,
+            routes: [],
+            stationDepartures: [],
+            runs: []
+        };
+
+        this.handleZoom = this.handleZoom.bind(this);
+        this.updateData = this.updateData.bind(this);
+
+        updateRefresh = updateRefresh.bind(this);
+        displayRefresh = displayRefresh.bind(this);
+        setInitialRefreshRate = setInitialRefreshRate.bind(this);
+        initialiseRefreshRate = initialiseRefreshRate.bind(this);
     }
 
     render() {
@@ -164,10 +226,17 @@ export default class Map extends Component {
         const stations = this.state.stationDepartures;
         const runs = this.state.runs;
 
+        initialiseRefreshRate();
+
         return (
             <div id='transport'>
-                <LeafletMap ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
-
+                <LeafletMap id="map" ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
+                    <Control position="bottomleft">
+                        <div id="refreshBox">
+                            Refresh Rate: <input type="text" defaultValue={DEF_API_REP_FREQ + " seconds"} size="10" id="refreshDisplay" disabled/><br/>
+                            <input type="range" min={MIN_API_REP_FREQ} max={MAX_API_REP_FREQ} defaultValue={DEF_API_REP_FREQ} id="refreshSlider" onMouseUp={updateRefresh} onChange={displayRefreshSlider}/>
+                        </div>
+                    </Control>
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                         // url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -334,10 +403,10 @@ export default class Map extends Component {
                                                     }
 
                                                     return <span>
-                                                <strong>(Estimated)</strong> {this.getRouteName(stations[index].departures[index2].route_id) + " "}
-                                                        (to {this.getDirectionName(stations[index].departures[index2].route_id,
-                                                        stations[index].departures[index2].direction_id)}) -> {timeStamp} mins {schedule}<br/>
-                                            </span>
+                                                        <strong>(Estimated)</strong> {this.getRouteName(stations[index].departures[index2].route_id) + " "}
+                                                            (to {this.getDirectionName(stations[index].departures[index2].route_id,
+                                                            stations[index].departures[index2].direction_id)}) -> {timeStamp} mins {schedule}<br/>
+                                                    </span>
                                                 } else {
                                                     time = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                                     let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
