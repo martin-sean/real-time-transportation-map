@@ -68,10 +68,10 @@ function setInitialRefreshRate(refresh) {
 function updateRefresh() {
     this.refreshRate = document.getElementById("refreshSlider").value;
 
-    console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
 
     // Stop the current refresh cycle and restart with new refresh time
     if(this.refresh != null) {
+        console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
         clearInterval(this.refresh);
         this.refresh = setInterval(this.updateData, this.refreshRate * SECONDS_TO_MS);
     }
@@ -196,14 +196,13 @@ export default class Map extends Component {
 
     componentDidMount() {
         this.updateData();
+        initialiseRefreshRate();
     }
 
     render() {
         const position = [this.state.lat, this.state.lng];
         const stations = this.state.stationDepartures;
         const runs = this.state.runs;
-
-        initialiseRefreshRate();
 
         return (
             <LeafletMap id="map" ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
