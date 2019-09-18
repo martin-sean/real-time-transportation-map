@@ -76,10 +76,10 @@ function setInitialRefreshRate(refresh) {
 function updateRefresh() {
     this.refreshRate = document.getElementById("refreshSlider").value;
 
-    console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
 
     // Stop the current refresh cycle and restart with new refresh time
     if(this.refresh != null) {
+        console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
         clearInterval(this.refresh);
         this.refresh = setInterval(this.updateData, this.refreshRate * SECONDS_TO_MS);
     }
@@ -179,6 +179,7 @@ export default class Map extends Component {
 
     componentDidMount() {
         this.updateData();
+        initialiseRefreshRate();
 
         // Change route type button
         L.easyButton('<span class="route-type">&duarr;</span>', swapRouteType).addTo(L.map('transport'));
@@ -225,8 +226,6 @@ export default class Map extends Component {
         const position = [this.state.lat, this.state.lng];
         const stations = this.state.stationDepartures;
         const runs = this.state.runs;
-
-        initialiseRefreshRate();
 
         return (
             <div id='transport'>
