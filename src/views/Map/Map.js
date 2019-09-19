@@ -6,9 +6,6 @@ import Control from 'react-leaflet-control'
 
 import './Map.css';
 
-import 'leaflet-easybutton';
-import L from 'leaflet';
-
 // Importing Submodules
 import * as Stations from '../../modules/stations';
 import * as Departures from '../../modules/departures';
@@ -180,20 +177,6 @@ export default class Map extends Component {
     componentDidMount() {
         this.updateData();
         initialiseRefreshRate();
-
-        // Change route type button
-        L.easyButton('<span class="route-type">&duarr;</span>', swapRouteType).addTo(L.map('transport'));
-
-        axios.all([getRouteDescriptions(),
-            getStationDepartures(),
-            getRuns()])
-            .then((response) => {
-                this.setState({
-                    routes: response[0].data,
-                    stationDepartures: response[1].data,
-                    runs: response[2].data.runs
-                });
-            });
     }
 
     constructor(props) {
@@ -230,6 +213,9 @@ export default class Map extends Component {
         return (
             <div id='transport'>
                 <LeafletMap id="map" ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
+                    <Control position="topright">
+                        <button id="swapRouteTypeButton" onClick={ swapRouteType }>Switch Transport Type &#8693;</button>
+                    </Control>
                     <Control position="bottomleft">
                         <div id="refreshBox">
                             Refresh Rate: <input type="text" defaultValue={DEF_API_REP_FREQ + " seconds"} size="10" id="refreshDisplay" disabled/><br/>

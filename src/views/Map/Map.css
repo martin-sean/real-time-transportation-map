@@ -18,6 +18,12 @@
   height: 100vh;
 }
 
+#swapRouteTypeButton {
+    background-color: white;
+    color: black;
+    height: 30px;
+}
+
 #refreshBox {
     background-color: white;
     color: black;
