@@ -113,6 +113,13 @@ export default class Map extends Component {
         });
     }
 
+    updateCurrentCoordinates() {
+        const runs = this.state.runs;
+        this.setState({
+            runs: runs
+        });
+    }
+
     // Event handler when map is zoomed, adjusts icon sizes
     handleZoom() {
         // Determine how much to scale icons based on zoom level
@@ -177,6 +184,7 @@ export default class Map extends Component {
     componentDidMount() {
         this.updateData();
         initialiseRefreshRate();
+        setInterval(this.updateCurrentCoordinates, 5000);
     }
 
     constructor(props) {
@@ -198,6 +206,7 @@ export default class Map extends Component {
 
         this.handleZoom = this.handleZoom.bind(this);
         this.updateData = this.updateData.bind(this);
+        this.updateCurrentCoordinates = this.updateCurrentCoordinates.bind(this);
 
         updateRefresh = updateRefresh.bind(this);
         displayRefresh = displayRefresh.bind(this);
@@ -231,19 +240,18 @@ export default class Map extends Component {
                     <MarkerClusterGroup maxClusterRadius={10} ref={this.trainRef}>
                         {
                             runs.map((key, index) => {
-                                if (runs[index].departure[0].estimated_departure_utc) {
                                     // Determine timestamp (arrival time)
                                     let timeStamp;
                                     let icon;
                                     let angle;
                                     let tooltip;
 
-                                    if (runs[index].departure[0].estimated_departure_utc) {
-                                        const estimatedTime = moment.utc(runs[index].departure[0].estimated_departure_utc);
-                                        timeStamp = Math.abs(estimatedTime.diff(moment.utc(), 'minutes'));
+                                    if (runs[index].departure[runs[index].currentDeparture].estimated_departure_utc) {
+                                        const estimatedTime = moment.utc(runs[index].departure[runs[index].currentDeparture].estimated_departure_utc);
+                                        timeStamp = Math.abs(estimatedTime.diff(moment.utc(), 'seconds'));
                                     } else {
-                                        const scheduledTime = moment.utc(runs[index].departure[0].scheduled_departure_utc);
-                                        timeStamp = Math.abs(scheduledTime.diff(moment.utc(), 'minutes'));
+                                        const scheduledTime = moment.utc(runs[index].departure[runs[index].currentDeparture].scheduled_departure_utc);
+                                        timeStamp = Math.abs(scheduledTime.diff(moment.utc(), 'seconds'));
                                     }
 
                                     const previousStopCoordinates = runs[index].coordinates.previousStopCoordinates;
@@ -253,6 +261,7 @@ export default class Map extends Component {
                                     // For trains that are scheduled to depart from a station
                                     if (!previousStopCoordinates) {
                                         coordinates = runs[index].coordinates.nextStopCoordinates;
+                                        runs[index].currentCoordinates = runs[index].coordinates.nextStopCoordinates;
                                         icon = trainIcon;
                                     } else {
                                         icon = trainSideIcon;
@@ -271,24 +280,32 @@ export default class Map extends Component {
                                     let filteredDetails = [];
 
                                     for (let i in filteredDepartures) {
-                                        const departureTime = moment.utc(filteredDepartures[i].estimated_departure_utc);
-                                        const differenceInTime = Math.abs(departureTime.diff(moment.utc(), 'minutes'));
+                                        let departureTime;
+                                        if(filteredDepartures[i].estimated_departure_utc) {
+                                            departureTime = moment.utc(filteredDepartures[i].estimated_departure_utc);
+                                        } else {
+                                            departureTime = moment.utc(filteredDepartures[i].scheduled_departure_utc);
+                                        }
+                                        const differenceInTime = departureTime.diff(moment.utc(), 'seconds');
                                         const stopName = this.returnStopName(filteredDepartures[i].stop_id);
-                                        filteredDetails.push({
-                                            stopName: stopName,
-                                            differenceInTime: differenceInTime
-                                        });
+                                        if(differenceInTime >= 0) {
+                                            filteredDetails.push({
+                                                stopName: stopName,
+                                                differenceInTime: differenceInTime
+                                            });
+                                        }
                                     }
 
                                     // For running trains at platform
-                                    if (runs[index].departure[0].at_platform) {
+                                    if (runs[index].departure[runs[index].currentDeparture].at_platform) {
                                         coordinates = runs[index].coordinates.nextStopCoordinates;
+                                        runs[index].currentCoordinates = runs[index].coordinates.nextStopCoordinates;
                                         tooltip = <Tooltip>
-                                            <span><strong> {this.getRouteName(runs[index].departure[0].route_id)} </strong></span><br />
-                                            <span><strong>(to {this.getDirectionName(runs[index].departure[0].route_id,
+                                            <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
+                                            <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
                                                 runs[index].coordinates.direction_id)})</strong></span><br/>
                                             <span><strong>At {filteredDetails[0].stopName}</strong></span><br />
-                                            <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
+                                            <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
                                             <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
                                         </Tooltip>
 
@@ -308,19 +325,29 @@ export default class Map extends Component {
                                         } else {
                                             scalar = 0.5;
                                         }
+
+                                        if(runs[index].currentDeparture != 0) {
+                                            const time1 = moment.utc(runs[index].departure[runs[index].currentDeparture -1].scheduled_departure_utc);
+                                            const time2 = moment.utc(runs[index].departure[runs[index].currentDeparture].scheduled_departure_utc);
+                                            const travelTime = Math.abs(time2.diff(time1, 'seconds'));
+                                            console.log("TravelTime (" + this.returnStopName(runs[index].departure[runs[index].currentDeparture - 1].stop_id) + " -> " + this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id) + ") = " + travelTime + ", Remaining = " + timeStamp);
+                                            scalar = timeStamp / travelTime;
+                                        }
+
                                         coordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
+                                        runs[index].currentCoordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
                                         tooltip = <Tooltip>
-                                            <span><strong> {this.getRouteName(runs[index].departure[0].route_id)} </strong></span><br />
-                                            <span><strong>(to {this.getDirectionName(runs[index].departure[0].route_id,
+                                            <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
+                                            <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
                                                 runs[index].coordinates.direction_id)})</strong></span><br/>
-                                            <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
+                                            <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
                                             <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
                                         </Tooltip>
                                     }
 
                                     if (icon === trainIcon) {
-                                        console.log(this.getRouteName(runs[index].departure[0].route_id) + " Vehicle Coordinates: " + coordinates);
-                                        return <Marker icon={trainIcon} position={coordinates}>
+                                        console.log(this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id) + " Vehicle Coordinates: " + runs[index].currentCoordinates);
+                                        return <Marker icon={trainIcon} position={runs[index].currentCoordinates}>
                                             <Popup>
                                                 {
                                                     filteredDetails.map((key, index3) => {
@@ -332,15 +359,15 @@ export default class Map extends Component {
                                                 }
                                             </Popup>
                                             <Tooltip>
-                                                <span><strong> {this.getRouteName(runs[index].departure[0].route_id)} </strong></span><br />
-                                                <span><strong>(to {this.getDirectionName(runs[index].departure[0].route_id,
+                                                <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
+                                                <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
                                                     runs[index].coordinates.direction_id)})</strong></span><br/>
-                                                <span><strong>Run ID:</strong> {runs[index].departure[0].run_id}</span><br />
+                                                <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
                                                 <span><strong>Departure Time:</strong> {timeStamp}</span>
                                             </Tooltip>
                                         </Marker>
                                     } else {
-                                        return <RotatedMarker icon={icon} position={coordinates} rotationAngle={angle} rotationOrigin={'center'}>
+                                        return <RotatedMarker icon={icon} position={runs[index].currentCoordinates} rotationAngle={angle} rotationOrigin={'center'}>
                                             <Popup>
                                                 {
                                                     filteredDetails.map((key, index3) => {
@@ -354,7 +381,6 @@ export default class Map extends Component {
                                             {tooltip}
                                         </RotatedMarker>
                                     }
-                                }
                             })
                         }
                     </MarkerClusterGroup>
