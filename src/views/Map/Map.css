@@ -18,10 +18,18 @@
   height: 100vh;
 }
 
-#swapRouteTypeButton {
+.control {
     background-color: white;
     color: black;
-    height: 30px;
+    border-radius: 3px;
+    padding: 5px 10px 5px 10px;
+    box-shadow: 0 0 3px;
+    border: none;
+    margin: 3px;
+}
+
+.activeScheduledRuns {
+    background-color: lightgreen;
 }
 
 #refreshBox {
