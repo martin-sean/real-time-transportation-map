@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline } from 'react-leaflet';
+import {Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline} from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
 import Control from 'react-leaflet-control'
 // import worldGeoJSON from 'geojson-world-map';
@@ -16,7 +16,6 @@ import { trainIcon } from '../../components/leaflet-icons/train-icon/train-icon'
 import { trainSideIcon } from '../../components/leaflet-icons/train-icon/train-side-icon';
 import { trainSideInvertedIcon } from '../../components/leaflet-icons/train-icon/train-side-inverted-icon';
 import RotatedMarker from '../../components/leaflet-icons/RotatedMarker';
-import {Button} from "reactstrap";
 
 // Importing Packages
 const axios = require('axios');
@@ -72,8 +71,6 @@ function setInitialRefreshRate(refresh) {
 // Update API rate according to slider value
 function updateRefresh() {
     this.refreshRate = document.getElementById("refreshSlider").value;
-
-
     // Stop the current refresh cycle and restart with new refresh time
     if(this.refresh != null) {
         console.log("Setting new refresh rate to: " + this.refreshRate + " seconds");
@@ -87,7 +84,6 @@ function updateRefresh() {
 // Update text above slider to reflect refresh value
 function displayRefresh(refresh) {
     let text = refresh + " seconds";
-
     document.getElementById("refreshDisplay").value = text;
     document.getElementById("refreshDisplay").size = text.length;
 }
@@ -174,6 +170,28 @@ export default class Map extends Component {
         }
     }
 
+    // Calculate the punctuality of all departures
+    // TODO: Possibly move to backend and add API route
+    calculatePunctuality() {
+        let lateCount = 0, departureCount = 0;
+        const stations = this.state.stationDepartures;
+
+        for (let i in stations) {
+            for (let j in stations[i].departures) {
+                const estimatedTime = moment.utc(stations[i].departures[j].estimated_departure_utc);
+                const scheduledTime = moment.utc(stations[i].departures[j].scheduled_departure_utc);
+                if (!estimatedTime) continue; // Skip if estimated time not supplied
+
+                departureCount++;
+                // Count departures 5 minutes late or more
+                if (Math.abs(estimatedTime.diff(scheduledTime, 'minutes')) >= 5) {
+                    lateCount++;
+                }
+            }
+        }
+        return 100 - (lateCount * 100.00 / departureCount);
+    }
+
     componentDidMount() {
         this.updateData();
         initialiseRefreshRate();
@@ -209,14 +227,17 @@ export default class Map extends Component {
         const position = [this.state.lat, this.state.lng];
         const stations = this.state.stationDepartures;
         const runs = this.state.runs;
+        const punctuality = this.calculatePunctuality();
 
         return (
             <div id='transport'>
                 <LeafletMap id="map" ref={this.mapRef} center={position} zoom={this.state.zoom} maxZoom={17} onZoomEnd={this.handleZoom}>
                     <Control position="topright">
-                        <button id="swapRouteTypeButton" onClick={ swapRouteType }>Switch Transport Type &#8693;</button>
+                        {/* Render punctuality when there is data */}
+                        { !isNaN(punctuality) && <span id="punctualityLabel"><small>Punctuality: </small><span id="bold">{punctuality.toFixed(2)}</span> %</span> }
                     </Control>
                     <Control position="bottomleft">
+                        <button id="swapRouteTypeButton" onClick={ swapRouteType }>Switch Transport Type &#8693;</button>
                         <div id="refreshBox">
                             Refresh Rate: <input type="text" defaultValue={DEF_API_REP_FREQ + " seconds"} size="10" id="refreshDisplay" disabled/><br/>
                             <input type="range" min={MIN_API_REP_FREQ} max={MAX_API_REP_FREQ} defaultValue={DEF_API_REP_FREQ} id="refreshSlider" onMouseUp={updateRefresh} onChange={displayRefreshSlider}/>

@@ -22,6 +22,19 @@
     background-color: white;
     color: black;
     height: 30px;
+    margin-bottom: 10px;
+}
+
+#punctualityLabel {
+    background-color: white;
+    padding: 5px;
+    font-size: 14pt;
+    border-radius: 5px;
+    box-shadow: 0 0 3px;
+}
+
+#bold {
+    font-weight: bold;
 }
 
 #refreshBox {
