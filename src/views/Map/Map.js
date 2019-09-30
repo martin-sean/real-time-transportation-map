@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import { Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
-import Control from 'react-leaflet-control'
+import Control from 'react-leaflet-control';
+import { DriftMarker } from "leaflet-drift-marker";
 // import worldGeoJSON from 'geojson-world-map';
 
 import './Map.css';
@@ -184,7 +185,7 @@ export default class Map extends Component {
     componentDidMount() {
         this.updateData();
         initialiseRefreshRate();
-        setInterval(this.updateCurrentCoordinates, 5000);
+        setInterval(this.updateCurrentCoordinates, 10000);
     }
 
     constructor(props) {
@@ -240,6 +241,7 @@ export default class Map extends Component {
                     <MarkerClusterGroup maxClusterRadius={10} ref={this.trainRef}>
                         {
                             runs.map((key, index) => {
+                                if(runs[index].departure[runs[index].currentDeparture].estimated_departure_utc) {
                                     // Determine timestamp (arrival time)
                                     let timeStamp;
                                     let icon;
@@ -248,10 +250,10 @@ export default class Map extends Component {
 
                                     if (runs[index].departure[runs[index].currentDeparture].estimated_departure_utc) {
                                         const estimatedTime = moment.utc(runs[index].departure[runs[index].currentDeparture].estimated_departure_utc);
-                                        timeStamp = Math.abs(estimatedTime.diff(moment.utc(), 'seconds'));
+                                        timeStamp = estimatedTime.diff(moment.utc(), 'seconds');
                                     } else {
                                         const scheduledTime = moment.utc(runs[index].departure[runs[index].currentDeparture].scheduled_departure_utc);
-                                        timeStamp = Math.abs(scheduledTime.diff(moment.utc(), 'seconds'));
+                                        timeStamp = scheduledTime.diff(moment.utc(), 'seconds');
                                     }
 
                                     const previousStopCoordinates = runs[index].coordinates.previousStopCoordinates;
@@ -286,7 +288,7 @@ export default class Map extends Component {
                                         } else {
                                             departureTime = moment.utc(filteredDepartures[i].scheduled_departure_utc);
                                         }
-                                        const differenceInTime = departureTime.diff(moment.utc(), 'seconds');
+                                        const differenceInTime = departureTime.diff(moment.utc(), 'minutes');
                                         const stopName = this.returnStopName(filteredDepartures[i].stop_id);
                                         if(differenceInTime >= 0) {
                                             filteredDetails.push({
@@ -304,34 +306,39 @@ export default class Map extends Component {
                                             <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
                                             <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
                                                 runs[index].coordinates.direction_id)})</strong></span><br/>
-                                            <span><strong>At {filteredDetails[0].stopName}</strong></span><br />
+                                            <span><strong>At {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}</strong></span><br />
                                             <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
                                             <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
                                         </Tooltip>
 
                                     } else if (previousStopCoordinates) {
                                         let scalar;
-                                        if (timeStamp > 3) {
-                                            scalar = 0.9;
-                                        }
-                                        else if (timeStamp === 3) {
-                                            scalar = 0.75;
-                                        }
-                                        else if (timeStamp === 2) {
-                                            scalar = 0.6;
-                                        }
-                                        else if (timeStamp < 1) {
-                                            scalar = 0.3;
-                                        } else {
-                                            scalar = 0.5;
-                                        }
 
                                         if(runs[index].currentDeparture != 0) {
                                             const time1 = moment.utc(runs[index].departure[runs[index].currentDeparture -1].scheduled_departure_utc);
                                             const time2 = moment.utc(runs[index].departure[runs[index].currentDeparture].scheduled_departure_utc);
                                             const travelTime = Math.abs(time2.diff(time1, 'seconds'));
                                             console.log("TravelTime (" + this.returnStopName(runs[index].departure[runs[index].currentDeparture - 1].stop_id) + " -> " + this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id) + ") = " + travelTime + ", Remaining = " + timeStamp);
-                                            scalar = timeStamp / travelTime;
+                                            if(timeStamp >= 0) {
+                                                scalar = timeStamp / travelTime;
+                                            } else {
+                                                scalar = 0;
+                                            }
+                                        } else {
+                                            if (timeStamp > 3) {
+                                                scalar = 0.9;
+                                            }
+                                            else if (timeStamp === 3) {
+                                                scalar = 0.75;
+                                            }
+                                            else if (timeStamp === 2) {
+                                                scalar = 0.6;
+                                            }
+                                            else if (timeStamp < 1) {
+                                                scalar = 0.3;
+                                            } else {
+                                                scalar = 0.5;
+                                            }
                                         }
 
                                         coordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
@@ -367,7 +374,7 @@ export default class Map extends Component {
                                             </Tooltip>
                                         </Marker>
                                     } else {
-                                        return <RotatedMarker icon={icon} position={runs[index].currentCoordinates} rotationAngle={angle} rotationOrigin={'center'}>
+                                        return <RotatedMarker icon={icon} position={runs[index].currentCoordinates} rotationAngle={angle} rotationOrigin={'center'} duration={10000}>
                                             <Popup>
                                                 {
                                                     filteredDetails.map((key, index3) => {
@@ -381,6 +388,7 @@ export default class Map extends Component {
                                             {tooltip}
                                         </RotatedMarker>
                                     }
+                                }
                             })
                         }
                     </MarkerClusterGroup>
@@ -408,7 +416,7 @@ export default class Map extends Component {
                                                     const scheduledTime = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                                     let diff = Math.abs(estimatedTime.diff(scheduledTime, 'minutes'));
                                                     if (stations[index].departures[index2].estimated_departure_utc && diff > 0) {
-                                                        console.log(this.getRouteName(stations[index].departures[index2].route_id) + " is late by " + diff + " mins");
+                                                        // console.log(this.getRouteName(stations[index].departures[index2].route_id) + " is late by " + diff + " mins");
                                                         let highlight = diff >= 10 ? "very-late-highlight" : diff >= 5 ? "late-highlight" : "behind-highlight";
                                                         schedule = <mark id={highlight}>{'(' + diff + ' min late)'}</mark>;
                                                     }
@@ -420,7 +428,7 @@ export default class Map extends Component {
                                                     </span>
                                                 } else {
                                                     time = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
-                                                    let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
+                                                    let timeStamp = time.diff(moment.utc(), 'minutes');
                                                     return <span>
                                                 (Scheduled) {this.getRouteName(stations[index].departures[index2].route_id) + " "}
                                                         (to {this.getDirectionName(stations[index].departures[index2].route_id,
