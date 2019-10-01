@@ -13,16 +13,25 @@
     opacity: 0.8 !important;
 }
 
-#map {
-  width: 100vw;
-  height: 100vh;
-}
-
-#swapRouteTypeButton {
+.control {
     background-color: white;
     color: black;
     height: 30px;
-    margin-bottom: 10px;
+    border-radius: 3px;
+    padding: 5px 10px 5px 10px;
+    box-shadow: 0 0 3px;
+    border: none;
+    margin: 3px;
+    width: 100%;
+}
+
+.activeScheduledRuns {
+    background-color: lightgreen;
+}
+
+#map {
+    width: 100vw;
+    height: 100vh;
 }
 
 #punctualityLabel {
@@ -37,14 +46,13 @@
     font-weight: bold;
 }
 
+#controlPanel {
+    width: 10vw;
+}
+
 #refreshBox {
-    background-color: white;
-    color: black;
     overflow: auto;
-    width: 30vh;
-    border-radius: 3px;
-    padding: 5px 10px 5px 10px;
-    box-shadow: 0 0 3px;
+    height: 50px;
 }
 
 #refreshDisplay {
