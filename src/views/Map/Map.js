@@ -2,12 +2,10 @@ import React, { Component } from 'react';
 import {Map as LeafletMap, LayerGroup, TileLayer, Marker, Popup, Tooltip, Polyline} from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
 import Control from 'react-leaflet-control';
-// import worldGeoJSON from 'geojson-world-map';
 
 import './Map.css';
 
 // Importing Submodules
-import * as Stations from '../../modules/stations';
 import * as Departures from '../../modules/departures';
 
 // Importing Components
@@ -278,13 +276,15 @@ export default class Map extends Component {
                         {
                             runs.map((key, index) => {
                                 if(this.state.scheduledRunsVisible || runs[index].departure[runs[index].currentDeparture].estimated_departure_utc) {
-                                    // Determine timestamp (arrival time)
                                     let timeStamp;
                                     let icon;
                                     let angle;
                                     let tooltip;
                                     let arrivalTime;
+                                    let atPlatform = runs[index].departure[runs[index].currentDeparture].at_platform;
+                                    let runStarted = runs[index].currentDeparture > 0;
 
+                                    // Determine timestamp (arrival time to next stop)
                                     if (runs[index].departure[runs[index].currentDeparture].estimated_departure_utc) {
                                         arrivalTime = moment.utc(runs[index].departure[runs[index].currentDeparture].estimated_departure_utc);
                                     } else {
@@ -295,23 +295,43 @@ export default class Map extends Component {
                                     const previousStopCoordinates = runs[index].coordinates.previousStopCoordinates;
                                     const nextStopCoordinates = runs[index].coordinates.nextStopCoordinates;
 
-                                    // For trains that are scheduled to depart from a station
-                                    if (!previousStopCoordinates) {
+                                    // Set appropriate icons for trains and their properties
+                                    if (atPlatform || !runStarted) {
                                         runs[index].currentCoordinates = runs[index].coordinates.nextStopCoordinates;
+                                        angle = 0;
                                         icon = trainIcon;
                                     } else {
-                                        icon = trainSideIcon;
+                                        // Trains currently travelling between stations
+                                        let scalar;
+                                        let timeStampSeconds = arrivalTime.diff(moment.utc(), 'seconds');
 
-                                        // Determine angle of the train icon
+                                        // Calculation for determining current position of vehicle between two stops
+                                        let prevDeparture = runs[index].departure[runs[index].currentDeparture - 1];
+                                        let nextDeparture = runs[index].departure[runs[index].currentDeparture];
+                                        const time1 = moment.utc(prevDeparture.estimated_departure_utc ? prevDeparture.estimated_departure_utc : prevDeparture.scheduled_departure_utc);
+                                        const time2 = moment.utc(nextDeparture.estimated_departure_utc ? nextDeparture.estimated_departure_utc : nextDeparture.scheduled_departure_utc);
+                                        const travelTime = Math.abs(time2.diff(time1, 'seconds'));
+                                        if(timeStamp >= 0) {
+                                            scalar = timeStampSeconds / travelTime;
+                                        } else {
+                                            // Do not allow vehilces to go past next stop
+                                            // if expected arrival time has passed
+                                            scalar = 0;
+                                        }
+
+                                        runs[index].currentCoordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
                                         angle = Departures.calculateAngle(previousStopCoordinates, nextStopCoordinates);
                                         if (nextStopCoordinates[0] < previousStopCoordinates[0]) {
                                             angle += 90;
+                                            icon = trainSideIcon;
                                         } else {
                                             angle += 90;
                                             icon = trainSideInvertedIcon;
                                         }
                                     }
 
+
+                                    // Determine future stop time arrivals (timetable on mouseover / click)
                                     let filteredDepartures = runs[index].departure;
                                     let filteredDetails = [];
 
@@ -324,7 +344,7 @@ export default class Map extends Component {
                                         }
                                         const differenceInTime = departureTime.diff(moment.utc(), 'minutes');
                                         const stopName = this.returnStopName(filteredDepartures[i].stop_id);
-                                        if(differenceInTime >= 0) {
+                                        if(differenceInTime >= 0 || i == runs[index].currentDeparture) {
                                             filteredDetails.push({
                                                 stopName: stopName,
                                                 differenceInTime: differenceInTime
@@ -332,106 +352,47 @@ export default class Map extends Component {
                                         }
                                     }
 
+                                    // Get previous station name
                                     let prevStation;
-                                    if(runs[index].currentDeparture != 0 ) {
+                                    if(runStarted) {
                                         prevStation = this.returnStopName(runs[index].departure[runs[index].currentDeparture - 1].stop_id);
                                     } else {
                                         prevStation = "None";
                                     }
 
-                                    if (runs[index].departure[runs[index].currentDeparture].at_platform) {
-                                        // Trains currently stopped at a station
-                                        runs[index].currentCoordinates = runs[index].coordinates.nextStopCoordinates;
-                                        tooltip = <Tooltip>
-                                            <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
-                                            <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
-                                                runs[index].coordinates.direction_id)})</strong></span><br/>
-                                            <span><strong>At {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}</strong></span><br />
-                                            <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
-                                            <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
-                                            <span><strong>Previous Stop:</strong> {prevStation}</span><br />
-                                            <span><strong>Next Stop:</strong> {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}</span><br />
-                                        </Tooltip>
+                                    // Rendering flags
+                                    let beginningRun = atPlatform && !runStarted;
+                                    let stoppedAtStation = atPlatform && runStarted;
 
-                                    } else if (previousStopCoordinates) {
-                                        // Trains currently travelling between stations
-                                        let scalar;
-                                        let timeStampSeconds = arrivalTime.diff(moment.utc(), 'seconds');
-
-                                        // Calculation for determining current position of vehicle between two stops
-                                        if(runs[index].currentDeparture != 0) {
-                                            // Precise positioning
-                                            const time1 = moment.utc(runs[index].departure[runs[index].currentDeparture - 1].scheduled_departure_utc);
-                                            const time2 = moment.utc(runs[index].departure[runs[index].currentDeparture].scheduled_departure_utc);
-                                            const travelTime = Math.abs(time2.diff(time1, 'seconds'));
-                                            // console.log("TravelTime (" + this.returnStopName(runs[index].departure[runs[index].currentDeparture - 1].stop_id) + " -> " + this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id) + ") = " + travelTime + ", Remaining = " + timeStampSeconds);
-                                            if(timeStamp >= 0) {
-                                                scalar = timeStampSeconds / travelTime;
-                                            } else {
-                                                scalar = 0;
-                                            }
-                                        } else {
-                                            // Default positioning
-                                            if (timeStamp > 3) {
-                                                scalar = 0.9;
-                                            }
-                                            else if (timeStamp === 3) {
-                                                scalar = 0.75;
-                                            }
-                                            else if (timeStamp === 2) {
-                                                scalar = 0.6;
-                                            }
-                                            else if (timeStamp < 1) {
-                                                scalar = 0.3;
-                                            } else {
-                                                scalar = 0.5;
-                                            }
+                                    tooltip = <Tooltip>
+                                        <div><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></div>
+                                        <div><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
+                                            runs[index].coordinates.direction_id)})</strong></div>
+                                        <div><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</div>
+                                        {beginningRun &&
+                                            <div><strong>Next Stop:</strong> {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}<br/>
+                                            <strong>Departure Time:</strong> {timeStamp} min</div>
                                         }
+                                        {stoppedAtStation &&
+                                            <div><strong>At {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}</strong><br/></div>
+                                        }
+                                        {runStarted &&
+                                            <div><strong>Previous Stop:</strong> {prevStation}<br/>
+                                            <strong>Next Stop:</strong> {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}<br/>
+                                            <strong>Arrival Time:</strong> {timeStamp} min</div>
+                                        }
+                                    </Tooltip>
 
-                                        runs[index].currentCoordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
-                                        tooltip = <Tooltip>
-                                            <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
-                                            <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
-                                                runs[index].coordinates.direction_id)})</strong></span><br/>
-                                            <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
-                                            <span><strong>Arrival Time:</strong> {timeStamp} min</span><br />
-                                            <span><strong>Previous Stop:</strong> {prevStation}</span><br />
-                                            <span><strong>Next Stop:</strong> {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}</span><br />
-                                        </Tooltip>
-                                    }
-
-                                    if (icon === trainIcon) {
-                                        // Trains that are about to start their run
-                                        // console.log(this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id) + " Vehicle Coordinates: " + runs[index].currentCoordinates);
-                                        return <Marker icon={trainIcon} position={runs[index].currentCoordinates}>
-                                            <Popup>
-                                                {
-                                                    filteredDetails.map((key, index3) => {
-                                                        return <span>
-                                                        <strong>{filteredDetails[index3].differenceInTime}</strong> minutes -> <strong>{filteredDetails[index3].stopName}</strong>
-                                                        <br />
-                                                    </span>
-                                                    })
-                                                }
-                                            </Popup>
-                                            <Tooltip>
-                                                <span><strong> {this.getRouteName(runs[index].departure[runs[index].currentDeparture].route_id)} </strong></span><br />
-                                                <span><strong>(to {this.getDirectionName(runs[index].departure[runs[index].currentDeparture].route_id,
-                                                    runs[index].coordinates.direction_id)})</strong></span><br/>
-                                                <span><strong>Run ID:</strong> {runs[index].departure[runs[index].currentDeparture].run_id}</span><br />
-                                                <span><strong>Departure Time:</strong> {timeStamp} min</span>
-                                            </Tooltip>
-                                        </Marker>
-                                    } else {
-                                        // Trains that are currently in the middle of their run
+                                    // Condition ignores trains that have not arrived at their first scheduled stop
+                                    if (atPlatform || runStarted) {
                                         return <RotatedMarker icon={icon} position={runs[index].currentCoordinates} rotationAngle={angle} rotationOrigin={'center'}>
                                             <Popup>
                                                 {
                                                     filteredDetails.map((key, index3) => {
-                                                        return <span>
+                                                        return <div>
                                                         <strong>{filteredDetails[index3].differenceInTime}</strong> minutes -> <strong>{filteredDetails[index3].stopName}</strong>
                                                         <br />
-                                                    </span>
+                                                        </div>
                                                     })
                                                 }
                                             </Popup>
@@ -458,32 +419,36 @@ export default class Map extends Component {
                                                 // Calculated time arrival and render on tooltip
                                                 if(stations[index].departures[index2].estimated_departure_utc) {
                                                     time = moment.utc(stations[index].departures[index2].estimated_departure_utc);
-                                                    let timeStamp = Math.abs(time.diff(moment.utc(), 'minutes'));
+                                                    let timeStamp = time.diff(moment.utc(), 'minutes');
 
-                                                    // Calculate difference in estimated and scheduled time
-                                                    let schedule = "";
-                                                    const estimatedTime = moment.utc(stations[index].departures[index2].estimated_departure_utc);
-                                                    const scheduledTime = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
-                                                    let diff = Math.abs(estimatedTime.diff(scheduledTime, 'minutes'));
-                                                    if (stations[index].departures[index2].estimated_departure_utc && diff > 0) {
-                                                        // console.log(this.getRouteName(stations[index].departures[index2].route_id) + " is late by " + diff + " mins");
-                                                        let highlight = diff >= 10 ? "very-late-highlight" : diff >= 5 ? "late-highlight" : "behind-highlight";
-                                                        schedule = <mark id={highlight}>{'(' + diff + ' min late)'}</mark>;
+                                                    if(timeStamp >= 0) {
+                                                        // Calculate difference in estimated and scheduled time
+                                                        let schedule = "";
+                                                        const estimatedTime = moment.utc(stations[index].departures[index2].estimated_departure_utc);
+                                                        const scheduledTime = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
+                                                        let diff = Math.abs(estimatedTime.diff(scheduledTime, 'minutes'));
+                                                        if (stations[index].departures[index2].estimated_departure_utc && diff > 0) {
+                                                            let highlight = diff >= 10 ? "very-late-highlight" : diff >= 5 ? "late-highlight" : "behind-highlight";
+                                                            schedule = <mark id={highlight}>{'(' + diff + ' min late)'}</mark>;
+                                                        }
+
+                                                        return <div>
+                                                            <strong>(Estimated)</strong> {this.getRouteName(stations[index].departures[index2].route_id) + " "}
+                                                                (to {this.getDirectionName(stations[index].departures[index2].route_id,
+                                                                stations[index].departures[index2].direction_id)}) -> {timeStamp} mins {schedule}<br/>
+                                                        </div>
                                                     }
-
-                                                    return <span>
-                                                        <strong>(Estimated)</strong> {this.getRouteName(stations[index].departures[index2].route_id) + " "}
-                                                            (to {this.getDirectionName(stations[index].departures[index2].route_id,
-                                                            stations[index].departures[index2].direction_id)}) -> {timeStamp} mins {schedule}<br/>
-                                                    </span>
                                                 } else if(this.state.scheduledRunsVisible) {
                                                     time = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
                                                     let timeStamp = time.diff(moment.utc(), 'minutes');
-                                                    return <span>
-                                                (Scheduled) {this.getRouteName(stations[index].departures[index2].route_id) + " "}
-                                                        (to {this.getDirectionName(stations[index].departures[index2].route_id,
-                                                        stations[index].departures[index2].direction_id)}) -> {timeStamp} mins<br/>
-                                                    </span>
+
+                                                    if(timeStamp >= 0) {
+                                                    return <div>
+                                                    (Scheduled) {this.getRouteName(stations[index].departures[index2].route_id) + " "}
+                                                            (to {this.getDirectionName(stations[index].departures[index2].route_id,
+                                                            stations[index].departures[index2].direction_id)}) -> {timeStamp} mins<br/>
+                                                        </div>
+                                                    }
                                                 }
                                             })
                                         }
@@ -492,16 +457,6 @@ export default class Map extends Component {
                             })
                         }
                     </LayerGroup>
-
-                    {
-                        // REQUIRES STATIONS TO BE SORTED IN TRAVERSAL ORDER
-                        //     stations.map((key, index) => {
-                        //         if (index < stations.length - 1) {
-                        //             const positions = [[stations[index].stop_latitude, stations[index].stop_longitude], [stations[index + 1].stop_latitude, stations[index + 1].stop_longitude]];
-                        //             return <Polyline positions={positions} />
-                        //         }
-                        //     })
-                    }
                 </LeafletMap>
             </div>
         );
