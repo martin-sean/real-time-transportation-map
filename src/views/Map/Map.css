@@ -23,6 +23,8 @@
     border: none;
     margin: 3px;
     width: 100%;
+    overflow: auto;
+    min-width: 200px;
 }
 
 .activeScheduledRuns {
