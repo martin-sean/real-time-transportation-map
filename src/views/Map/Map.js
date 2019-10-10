@@ -9,6 +9,8 @@ import './Map.css';
 import * as Departures from '../../modules/departures';
 
 // Importing Components
+import { trainSideDelayedIcon} from "../../components/leaflet-icons/train-icon/train-side-delayed-icon";
+import { trainSideInvertedDelayedIcon} from "../../components/leaflet-icons/train-icon/train-side-inverted-delayed";
 import { railIcon } from '../../components/leaflet-icons/rail-icon/rail-icon';
 import { trainIcon } from '../../components/leaflet-icons/train-icon/train-icon';
 import { trainSideIcon } from '../../components/leaflet-icons/train-icon/train-side-icon';
@@ -143,6 +145,8 @@ export default class Map extends Component {
         trainIcon.options.iconSize = [vehicleSize, vehicleSize];
         trainSideIcon.options.iconSize = [vehicleSize, vehicleSize];
         trainSideInvertedIcon.options.iconSize = [vehicleSize, vehicleSize];
+        trainSideDelayedIcon.options.iconSize = [vehicleSize, vehicleSize];
+        trainSideInvertedDelayedIcon.options.iconSize = [vehicleSize, vehicleSize];
 
         // Force update train icons
         let layers = this.trainRef.current.leafletElement.getLayers();
@@ -319,17 +323,22 @@ export default class Map extends Component {
                                             scalar = 0;
                                         }
 
+                                        // Check if on time
+                                        const estimatedTime = moment.utc(nextDeparture.estimated_departure_utc);
+                                        const scheduledTime = moment.utc(nextDeparture.scheduled_departure_utc);
+
+                                        let onTime = estimatedTime.diff(scheduledTime, 'minutes') <= 5;
+
                                         runs[index].currentCoordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
                                         angle = Departures.calculateAngle(previousStopCoordinates, nextStopCoordinates);
                                         if (nextStopCoordinates[0] < previousStopCoordinates[0]) {
                                             angle += 90;
-                                            icon = trainSideIcon;
+                                            icon = onTime ? trainSideIcon : trainSideDelayedIcon;
                                         } else {
                                             angle += 90;
-                                            icon = trainSideInvertedIcon;
+                                            icon = onTime ? trainSideInvertedIcon : trainSideInvertedDelayedIcon;
                                         }
                                     }
-
 
                                     // Determine future stop time arrivals (timetable on mouseover / click)
                                     let filteredDepartures = runs[index].departure;
@@ -381,7 +390,7 @@ export default class Map extends Component {
                                             <strong>Next Stop:</strong> {this.returnStopName(runs[index].departure[runs[index].currentDeparture].stop_id)}<br/>
                                             <strong>Arrival Time:</strong> {timeStamp} min</div>
                                         }
-                                    </Tooltip>
+                                    </Tooltip>;
 
                                     // Condition ignores trains that have not arrived at their first scheduled stop
                                     if (atPlatform || runStarted) {
@@ -390,8 +399,8 @@ export default class Map extends Component {
                                                 {
                                                     filteredDetails.map((key, index3) => {
                                                         return <div>
-                                                        <strong>{filteredDetails[index3].differenceInTime}</strong> minutes -> <strong>{filteredDetails[index3].stopName}</strong>
-                                                        <br />
+                                                            <strong>{filteredDetails[index3].differenceInTime}</strong> minutes -> <strong>{filteredDetails[index3].stopName}</strong>
+                                                            <br />
                                                         </div>
                                                     })
                                                 }
@@ -426,7 +435,7 @@ export default class Map extends Component {
                                                         let schedule = "";
                                                         const estimatedTime = moment.utc(stations[index].departures[index2].estimated_departure_utc);
                                                         const scheduledTime = moment.utc(stations[index].departures[index2].scheduled_departure_utc);
-                                                        let diff = Math.abs(estimatedTime.diff(scheduledTime, 'minutes'));
+                                                        let diff = estimatedTime.diff(scheduledTime, 'minutes');
                                                         if (stations[index].departures[index2].estimated_departure_utc && diff > 0) {
                                                             let highlight = diff >= 10 ? "very-late-highlight" : diff >= 5 ? "late-highlight" : "behind-highlight";
                                                             schedule = <mark id={highlight}>{'(' + diff + ' min late)'}</mark>;

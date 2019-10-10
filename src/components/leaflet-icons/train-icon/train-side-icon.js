@@ -1,6 +1,6 @@
 import L from 'leaflet';
 
-const trainSideIcon = new L.icon({
+const trainSideIcon = L.icon({
     iconUrl: require('../../../assets/icons/train_side.svg'),
     popupAnchor: [0, -10],
     tooltipAnchor: [20, 0],
