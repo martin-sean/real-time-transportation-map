@@ -327,16 +327,16 @@ export default class Map extends Component {
                                         const estimatedTime = moment.utc(nextDeparture.estimated_departure_utc);
                                         const scheduledTime = moment.utc(nextDeparture.scheduled_departure_utc);
 
-                                        let onTime = estimatedTime.diff(scheduledTime, 'minutes') <= 5;
+                                        let late = estimatedTime.diff(scheduledTime, 'minutes') >= 5;
 
                                         runs[index].currentCoordinates = Departures.determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates);
                                         angle = Departures.calculateAngle(previousStopCoordinates, nextStopCoordinates);
                                         if (nextStopCoordinates[0] < previousStopCoordinates[0]) {
                                             angle += 90;
-                                            icon = onTime ? trainSideIcon : trainSideDelayedIcon;
+                                            icon = late && estimatedTime ? trainSideDelayedIcon : trainSideIcon; // Don't render trains without an estimated time (real-time) as late
                                         } else {
                                             angle += 90;
-                                            icon = onTime ? trainSideInvertedIcon : trainSideInvertedDelayedIcon;
+                                            icon = late && estimatedTime ? trainSideInvertedDelayedIcon : trainSideInvertedIcon;
                                         }
                                     }
 
