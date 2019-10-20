@@ -80,8 +80,16 @@ export function getDeparturesForRuns(runs, departures) {
 }
 
 export function determineRunCoordinates(scalar, previousStopCoordinates, nextStopCoordinates) {
-    const xCoordinate = (scalar * previousStopCoordinates[0]) + ((1 - scalar) * nextStopCoordinates[0]);
-    const yCoordinate = (scalar * previousStopCoordinates[1]) + ((1 - scalar) * nextStopCoordinates[1]);
+    let xCoordinate;
+    let yCoordinate;
+    
+    if(previousStopCoordinates) {
+        xCoordinate = nextStopCoordinates[0] + scalar * (previousStopCoordinates[0] - nextStopCoordinates[0]);
+        yCoordinate = nextStopCoordinates[1] + scalar * (previousStopCoordinates[1] - nextStopCoordinates[1]);
+    } else {
+        xCoordinate = nextStopCoordinates[0];
+        yCoordinate = nextStopCoordinates[1];
+    }
 
     return [xCoordinate, yCoordinate];
 }

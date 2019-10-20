@@ -2,13 +2,12 @@ import L from 'leaflet';
 
 const railIcon = new L.icon({
     iconUrl: require('../../../assets/icons/rail2.svg'),
-    iconAnchor: [20, 20],
-    popupAnchor: [-5, -10],
-    tooltipAnchor: [20, 10],
+    popupAnchor: [0, -10],
+    tooltipAnchor: [20, 0],
     shadowUrl: null,
     shadowSize: null,
     shadowAnchor: null,
-    iconSize: [30, 40],
+    iconSize: [15, 15],
     className: 'leaflet-div-icon'
 });
 

@@ -1,14 +1,13 @@
 import L from 'leaflet';
 
-const trainSideIcon = new L.icon({
+const trainSideIcon = L.icon({
     iconUrl: require('../../../assets/icons/train_side.svg'),
-    iconAnchor: [20, 20],
-    popupAnchor: [-5, -10],
-    tooltipAnchor: [20, 10],
+    popupAnchor: [0, -10],
+    tooltipAnchor: [20, 0],
     shadowUrl: null,
     shadowSize: null,
     shadowAnchor: null,
-    iconSize: [30, 40],
+    iconSize: [20, 20],
     className: 'train-icon'
 });
 
